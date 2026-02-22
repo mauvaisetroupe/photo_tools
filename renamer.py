@@ -13,7 +13,7 @@ DRY_RUN = True  # Passez à False pour exécuter réellement
 EXT_PICTURES = ('.jpg', '.jpeg', '.rw2')
 EXT_VIDEOS = ('.avi', '.mp4', '.mts', '.mov')
 
-def get_exif_date(file_path):
+def get_date_taken(file_path):
     """ Équivalent de ExifHelper.java """
     try:
         with open(file_path, 'rb') as f:
@@ -23,25 +23,46 @@ def get_exif_date(file_path):
                 return datetime.strptime(img.datetime_original, '%Y:%m:%d %H:%M:%S')
     except:
         return None
+
+def get_date_from_file_pattern(filename):
+    """ Équivalent de NameCalculator.getDateFromFilePattern """
+    patterns = {
+        r'(\d{8})_(\d{6})': '%Y%m%d_%H%M%S',
+        r'(\d{8})-(\d{6})': '%Y%m%d-%H%M%S'
+    }
+    for pat, fmt in patterns.items():
+        match = re.search(pat, filename)
+        if match:
+            return datetime.strptime(match.group(), fmt)
     return None
 
-def get_clean_filename(filename, date_taken):
+def get_clean_filename(filename, date_taken, delete_prefix=True):
     """ Équivalent de NameCalculator.java """
     name, ext = os.path.splitext(filename)
-    
-    # 1. deletePrefix : Enlève PXL_, IMG_, etc.
-    name = re.sub(r'^[a-zA-Z_-]+', '', name)
-    
-    # 2. deleteDateAndTime : Enlève les dates existantes (20250501_090637)
-    name = re.sub(r'\d{8}[_-]?\d{6}', '', name)
-    
-    # 3. Nettoyage des caractères résiduels (cleanName)
-    name = re.sub(r'^[_-]+|[_-]+$', '', name)
-    name = re.sub(r'[_-]{2,}', '_', name)
-    
-    # 4. Construction du nom final
-    date_prefix = date_taken.strftime('%Y-%m-%d_%H-%M-%S')
-    return f"{date_prefix}_{name}{ext}" if name else f"{date_prefix}{ext}"
+
+    # 1. deleteResultDatePattern : Supprime YYYY-MM-DD_HH-mm-ss
+    name = re.sub(r'[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}', '', name)
+
+    # 2. deletePrefix : Supprime PXL_, etc.
+    if delete_prefix:
+        name = re.sub(r'^[a-zA-Z_-]+', '', name)
+
+    # 3. deleteDateAndTime : Supprime les occurrences de la date EXIF dans le nom
+    formats = ["%Y-%m-%d", "%Y%m%d", "%H-%M-%S", "%H%m%s"]
+    for fmt in formats:
+        fd = date_taken.strftime(fmt)
+        name = name.replace(fd, "")
+
+    # 4. Reconstruction (Date EXIF + Reste du nom)
+    prefix = date_taken.strftime('%Y-%m-%d_%H-%M-%S')
+    final_name = f"{prefix}_{name}"
+
+    # 5. cleanName : Nettoyage des underscores/tirets multiples
+    final_name = re.sub(r'[_]+', '_', final_name)
+    final_name = re.sub(r'[-]+', '-', final_name)
+    final_name = re.sub(r'^[-_]+|[-_]+$', '', final_name)
+
+    return final_name + ext
 
 def process():
     print(f"--- Démarrage (Mode {'TEST' if DRY_RUN else 'REEL'}) ---")
@@ -53,9 +74,12 @@ def process():
             is_vid = filename.lower().endswith(EXT_VIDEOS)
             
             if is_pic or is_vid:
-                # Extraction de la date (Priorité EXIF, sinon date fichier)
-                date_taken = get_exif_date(file_path)
+                # Recherche de la date (Priorité EXIF, puis Pattern Nom, puis FileDate)
+                date_taken = get_date_taken(file_path)
                 if not date_taken:
+                    date_taken = get_date_from_file_pattern(filename)
+                if not date_taken:
+                    # Fallback ultime sur la date du fichier
                     date_taken = datetime.fromtimestamp(os.path.getmtime(file_path))
 
                 new_name = get_clean_filename(filename, date_taken)
