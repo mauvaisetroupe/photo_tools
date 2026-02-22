@@ -103,9 +103,15 @@ def process(source_dir, dest_dir, dry_run):
                     print(f"[DRY-RUN] {filename} -> {target_dir}/{new_name}")
                 else:
                     os.makedirs(target_dir, exist_ok=True)
-                    # Déplacement (doMove)
-                    shutil.move(file_path, os.path.join(target_dir, new_name))
-                    print(f"Déplacé : {new_name}")
+                    dest_file = os.path.join(target_dir, new_name)
+                    
+                    # Sécurité : ne pas écraser si le fichier existe déjà
+                    if os.path.exists(dest_file):
+                        print(f"Saut : {new_name} existe déjà.")
+                    else:
+                        # sur le meme disque, shutil.move fait un "rename" qui est atomique 
+                        shutil.move(file_path, dest_file)
+                        print(f"Déplacé : {new_name}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script de tri et conversion de media.")
