@@ -3,11 +3,7 @@ import re
 import shutil
 from datetime import datetime
 from exif import Image
-
-# --- CONFIGURATION ---
-SOURCE_DIR = "/volume1/photo/IMPORT"
-DEST_DIR = "/volume1/photo/CONVERTED"
-DRY_RUN = True  # Passez à False pour exécuter réellement
+import argparse
 
 # Extensions supportées (MediaFactory)
 EXT_PICTURES = ('.jpg', '.jpeg', '.rw2')
@@ -64,10 +60,14 @@ def get_clean_filename(filename, date_taken, delete_prefix=True):
 
     return final_name + ext
 
-def process():
-    print(f"--- Démarrage (Mode {'TEST' if DRY_RUN else 'REEL'}) ---")
+def process(source_dir, dest_dir, dry_run):
+    print(f"Source: {source_dir}")
+    print(f"Destination: {dest_dir}")
+    print(f"Mode Dry Run: {dry_run}")
     
-    for root, _, files in os.walk(SOURCE_DIR):
+    print(f"--- Démarrage (Mode {'TEST' if dry_run else 'REEL'}) ---")
+    
+    for root, _, files in os.walk(source_dir):
         for filename in files:
             file_path = os.path.join(root, filename)
             is_pic = filename.lower().endswith(EXT_PICTURES)
@@ -88,11 +88,11 @@ def process():
                 sub_path = date_taken.strftime('%Y/%m/%d')
                 if is_vid:
                     # Comme dans votre Java : les vidéos vont dans un dossier VIDEOS
-                    target_dir = os.path.join(DEST_DIR, "VIDEOS", sub_path)
+                    target_dir = os.path.join(dest_dir, "VIDEOS", sub_path)
                 else:
-                    target_dir = os.path.join(DEST_DIR, sub_path)
+                    target_dir = os.path.join(dest_dir, sub_path)
 
-                if DRY_RUN:
+                if dry_run:
                     print(f"[DRY-RUN] {filename} -> {target_dir}/{new_name}")
                 else:
                     os.makedirs(target_dir, exist_ok=True)
@@ -101,4 +101,21 @@ def process():
                     print(f"Déplacé : {new_name}")
 
 if __name__ == "__main__":
-    process()
+    parser = argparse.ArgumentParser(description="Script de tri et conversion de media.")
+
+    parser.add_argument("source", help="Chemin du dossier source (IMPORT)")
+    parser.add_argument("dest", help="Chemin du dossier destination (CONVERTED)")
+    
+    # Pour dry_run, on utilise une action 'store_true' 
+    # Si --run est présent, dry_run sera False (ou inversement selon ta préférence)
+    parser.add_argument(
+        "--execute", 
+        action="store_false", 
+        dest="dry_run",
+        default=True,
+        help="Exécute réellement les opérations (par défaut : Dry Run activé)"
+    )
+
+    args = parser.parse_args()
+
+    process(args.source, args.dest, args.dry_run)
