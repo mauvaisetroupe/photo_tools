@@ -107,7 +107,7 @@ def process(source_dir, dest_dir, dry_run):
                     target_dir = os.path.join(dest_dir, sub_path)
 
                 if dry_run:
-                    print(f"[DRY-RUN] {filename} -> {target_dir}/{new_name}")
+                    print(f"[DRY-RUN] {file_path} -> {target_dir}/{new_name}")
                 else:
                     os.makedirs(target_dir, exist_ok=True)
                     dest_file = os.path.join(target_dir, new_name)
@@ -119,6 +119,57 @@ def process(source_dir, dest_dir, dry_run):
                         # sur le meme disque, shutil.move fait un "rename" qui est atomique 
                         shutil.move(file_path, dest_file)
                         print(f"Déplacé : {new_name}")
+
+def check_source_status(source_dir):
+    """
+    Parcourt le dossier source pour faire un inventaire final.
+    Affiche ce qui reste et pourquoi.
+    """
+    remaining_media = []
+    ignored_files = []
+    empty_dirs = 0
+    
+    print("\n" + "="*40)
+    print("🔍 AUDIT FINAL DU DOSSIER SOURCE")
+    print("="*40)
+
+    for root, dirs, files in os.walk(source_dir):
+        # Compte les dossiers (hors Synology)
+        visible_dirs = [d for d in dirs if not d.startswith('@')]
+        if not visible_dirs and not files:
+            empty_dirs += 1
+
+        for filename in files:
+            # Ignorer les fichiers système type .DS_Store ou @eaDir
+            if filename.startswith('.') or '@eaDir' in root:
+                continue
+                
+            file_path = os.path.join(root, filename)
+            
+            # Vérifie si c'est un média qui aurait dû être traité
+            if filename.lower().endswith(EXT_PICTURES + EXT_VIDEOS):
+                remaining_media.append(file_path)
+            else:
+                ignored_files.append(file_path)
+
+    # Affichage des résultats
+    if not remaining_media and not ignored_files:
+        print("✅ SUCCÈS : Le dossier source est totalement vide (hors fichiers cachés).")
+    else:
+        if remaining_media:
+            print(f"⚠️  ALERTE : {len(remaining_media)} médias n'ont pas été déplacés :")
+            for m in remaining_media[:5]: # Top 5 pour ne pas flood
+                print(f"   - {m}")
+            if len(remaining_media) > 5:
+                print(f"   ... et {len(remaining_media)-5} autres.")
+        
+        if ignored_files:
+            print(f"ℹ️  INFO : {len(ignored_files)} fichiers non-médias sont restés (ex: .txt, .json, .pdf) :")
+            for i in ignored_files[:5]:
+                print(f"   - {i}")
+    
+    print(f"\nDossiers restants : {empty_dirs} dossier(s) vide(s) à nettoyer manuellement.")
+    print("="*40)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script de tri et conversion de media.")
@@ -135,3 +186,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     process(args.source, args.dest, args.dry_run)
+
+    if not args.dry_run:
+            check_source_status(args.source)
+    else:
+        print("\n[DRY-RUN] Le check final est ignoré car aucun fichier n'a été déplacé.")

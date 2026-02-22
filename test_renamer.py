@@ -48,9 +48,9 @@ class TestPhotoIntegration(unittest.TestCase):
     def setUp(self):
         # Chemin relatif ou absolu vers ta photo de test
         self.test_photo_path = "test/PXL_20250430_080736678.MP.jpg"
-        
-        if not os.path.exists(self.test_photo_path):
-            self.skipTest(f"Fichier de test absent : {self.test_photo_path}")
+        self.test_photo_shoud_not_be_renamed = "test/2025-04-30_10-07-36_080736678.MP.jpg"
+        self.test_photo_path_bad_time = "test/2025-04-30_09-07-36_080736678.MP.jpg"
+        self.expected = "2025-04-30_10-07-36_080736678.MP.jpg"
 
     def test_exif_extraction_and_rename(self):
         # 1. Test lecture EXIF
@@ -63,8 +63,33 @@ class TestPhotoIntegration(unittest.TestCase):
         filename = os.path.basename(self.test_photo_path)
         result = get_clean_filename(filename, date_extracted)
         
-        expected = "2025-04-30_10-07-36_080736678.MP.jpg"
-        self.assertEqual(result, expected)
+        self.assertEqual(result, self.expected)
+
+    def test_exif_extraction_and_rename_hour_changed(self):
+        # 1. Test lecture EXIF
+        date_extracted = get_date_taken(self.test_photo_path_bad_time)
+        
+        self.assertIsNotNone(date_extracted, "L'EXIF n'a pas pu être lu sur le fichier réel.")
+        self.assertEqual(date_extracted.strftime('%Y-%m-%d %H:%M:%S'), "2025-04-30 10:07:36")
+
+        # 2. Test renommage avec cette date
+        filename = os.path.basename(self.test_photo_path_bad_time)
+        result = get_clean_filename(filename, date_extracted)
+        
+        self.assertEqual(result, self.expected)
+
+    def test_exif_extraction_should_not_be_renamed(self):
+        # 1. Test lecture EXIF
+        date_extracted = get_date_taken(self.test_photo_shoud_not_be_renamed)
+        
+        self.assertIsNotNone(date_extracted, "L'EXIF n'a pas pu être lu sur le fichier réel.")
+        self.assertEqual(date_extracted.strftime('%Y-%m-%d %H:%M:%S'), "2025-04-30 10:07:36")
+
+        # 2. Test renommage avec cette date
+        filename = os.path.basename(self.test_photo_shoud_not_be_renamed)
+        result = get_clean_filename(filename, date_extracted)
+        
+        self.assertEqual(result, self.expected)
 
 if __name__ == '__main__':
     unittest.main()
