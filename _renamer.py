@@ -33,31 +33,38 @@ def get_date_from_file_pattern(filename):
     return None
 
 def get_clean_filename(filename, date_taken, delete_prefix=True):
-    """ Équivalent de NameCalculator.java """
     name, ext = os.path.splitext(filename)
 
-    # 1. deleteResultDatePattern : Supprime YYYY-MM-DD_HH-mm-ss
-    name = re.sub(r'[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}', '', name)
+    # 1. Supprime l'ancien pattern de date YYYY-MM-DD_HH-MM-SS
+    name = re.sub(r'\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}', '', name)
 
-    # 2. deletePrefix : Supprime PXL_, etc.
+    # 2. Supprime les préfixes (PXL_, IMG_, etc.)
     if delete_prefix:
-        name = re.sub(r'^[a-zA-Z_-]+', '', name)
+        name = re.sub(r'^[a-zA-Z]{2,4}[_-]', '', name)
 
-    # 3. deleteDateAndTime : Supprime les occurrences de la date EXIF dans le nom
-    formats = ["%Y-%m-%d", "%Y%m%d", "%H-%M-%S", "%H%M%S"]
+    # 3. Supprime les occurrences de la date EXIF dans le nom original
+    formats = ["%Y-%m-%d", "%H-%M-%S", "%Y%m%d", "%H%M%S"]
     for fmt in formats:
         fd = date_taken.strftime(fmt)
         name = name.replace(fd, "")
 
-    # 4. Reconstruction (Date EXIF + Reste du nom)
+    # 4. NETTOYAGE INTELLIGENT :
+    # On réduit les répétitions de chaque caractère individuellement
+    name = re.sub(r'_+', '_', name)  # ___ -> _
+    name = re.sub(r'-+', '-', name)  # --- -> -
+    # On supprime les mélanges bizarres en début/fin
+    name = name.strip('-_')
+
+    # 5. Construction de la base
     prefix = date_taken.strftime('%Y-%m-%d_%H-%M-%S')
-    final_name = f"{prefix}_{name}"
+    
+    if name:
+        # On s'assure qu'il n'y a qu'un seul underscore entre le prefixe et le nom
+        final_name = f"{prefix}_{name}"
+    else:
+        final_name = f"{prefix}"
 
-    # 5. cleanName : Nettoyage des underscores/tirets multiples
-    final_name = re.sub(r'[_]+', '_', final_name)
-    final_name = re.sub(r'[-]+', '-', final_name)
-    final_name = re.sub(r'^[-_]+|[-_]+$', '', final_name)
-
+    # 6. Assemblage final avec l'extension
     return final_name + ext
 
 def process(source_dir, dest_dir, dry_run):
