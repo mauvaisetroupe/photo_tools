@@ -44,7 +44,7 @@ def get_clean_filename(filename, date_taken, delete_prefix=True):
         name = re.sub(r'^[a-zA-Z_-]+', '', name)
 
     # 3. deleteDateAndTime : Supprime les occurrences de la date EXIF dans le nom
-    formats = ["%Y-%m-%d", "%Y%m%d", "%H-%M-%S", "%H%m%s"]
+    formats = ["%Y-%m-%d", "%Y%m%d", "%H-%M-%S", "%H%M%S"]
     for fmt in formats:
         fd = date_taken.strftime(fmt)
         name = name.replace(fd, "")
@@ -67,8 +67,15 @@ def process(source_dir, dest_dir, dry_run):
     
     print(f"--- Démarrage (Mode {'TEST' if dry_run else 'REEL'}) ---")
     
-    for root, _, files in os.walk(source_dir):
+    for root, dirs, files in os.walk(source_dir):
+        # Ignorer les dossiers système Synology (@eaDir) ---
+        dirs[:] = [d for d in dirs if not d.startswith('@')]
+        
         for filename in files:
+            # Ignorer les fichiers cachés (ex: .DS_Store) ---
+            if filename.startswith('.'):
+                continue
+                
             file_path = os.path.join(root, filename)
             is_pic = filename.lower().endswith(EXT_PICTURES)
             is_vid = filename.lower().endswith(EXT_VIDEOS)
@@ -102,18 +109,14 @@ def process(source_dir, dest_dir, dry_run):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script de tri et conversion de media.")
-
-    parser.add_argument("source", help="Chemin du dossier source (IMPORT)")
-    parser.add_argument("dest", help="Chemin du dossier destination (CONVERTED)")
-    
-    # Pour dry_run, on utilise une action 'store_true' 
-    # Si --run est présent, dry_run sera False (ou inversement selon ta préférence)
+    parser.add_argument("source", help="Chemin du dossier source")
+    parser.add_argument("dest", help="Chemin du dossier destination")
     parser.add_argument(
         "--execute", 
         action="store_false", 
         dest="dry_run",
         default=True,
-        help="Exécute réellement les opérations (par défaut : Dry Run activé)"
+        help="Exécute réellement les opérations"
     )
 
     args = parser.parse_args()
